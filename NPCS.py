@@ -126,22 +126,25 @@ def bad():
 
 
     
-def quit_it():
-    header_list = ['Box ID', 'Part', 'Alt Part Number', 'Type', 'Desc', 'Package', 'Date', 'Quantity']
-    if csv_file_name and os.path.exists(csv_file_name) and os.path.getsize(csv_file_name) > 0:
-        try:
-            df = pd.read_csv(csv_file_name, header=None, dtype=str, encoding='utf-8')
-            df = df.reindex(columns=range(8))
-            df.columns = header_list
-            df.to_csv(csv_file_name, index=False, encoding='utf-8')
-        except pd.errors.EmptyDataError:
-            pass
-        except PermissionError:
-            print("WARNING: Could not apply headers because the file is open in Excel.")
+HEADER_LIST = ['Box ID', 'Part', 'Alt Part Number', 'Type', 'Desc', 'Package', 'Date', 'Quantity']
 
-    cap.release()
+def write_row_to_csv(data_row):
+    """Writes a row and automatically adds headers if the file is new or empty."""
+    file_exists = os.path.exists(csv_file_name) and os.path.getsize(csv_file_name) > 0
+    with open(csv_file_name, mode='a', newline='', encoding='utf-8') as csvFile:
+        writer = csv.writer(csvFile)
+        if not file_exists:
+            writer.writerow(HEADER_LIST)
+        writer.writerow(data_row)
+
+def quit_it():
+    """Safely closes camera, destroys windows, and exits."""
+    try:
+        cap.release()
+    except Exception:
+        pass
     cv2.destroyAllWindows()
-    sys.exit()
+    sys.exit(0)
 
 
 def update_entry(index, text):
@@ -423,20 +426,27 @@ def populate_mouser_data(current_entry):
         print("DEBUG: Both primary and alternate part lookups failed.")
 
 
-def save_and_quit(current_entry):
+def save_and_quit_action(current_entry, text_boxes_list, root_win):
+    """Executes save logic, destroys Tkinter window, and safely closes app."""
+    for box, loc in text_boxes_list:
+        if box.get() != "":
+            update_entry(loc, box.get())
+
     populate_mouser_data(current_entry)
     current_entry[0] = f"{current_entry[3].upper()}, {current_entry[5]}"
+
     try:
-        with open(csv_file_name, mode='a', newline='', encoding='utf-8') as csvFile:
-            writer = csv.writer(csvFile)
-            writer.writerow(current_entry)
-            good()
-        quit_it()
+        write_row_to_csv(current_entry)
+        good()
     except PermissionError:
         print(f"ERROR: Cannot save. Please close {csv_file_name} in Excel!")
         bad()
-        messagebox.showerror("Save Error",
-                             f"Permission Denied!\n\nPlease close '{csv_file_name}' in Excel and try again.")
+        messagebox.showerror("Save Error", f"Permission Denied!\n\nPlease close '{csv_file_name}' in Excel and try again.")
+        return
+
+    # Must destroy Tkinter window FIRST so sys.exit() isn't trapped
+    root_win.destroy()
+    quit_it()
 
 
 # --- GUI Buttons ---
@@ -519,6 +529,12 @@ if __name__ == "__main__":
 
     while True:
         ret, frame = cap.read()
+
+        # Check if frame is valid before showing to prevent OpenCV crash
+        if not ret or frame is None:
+            time.sleep(0.05)
+            continue
+
         cv2.imshow("frame", frame)
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -576,7 +592,7 @@ if __name__ == "__main__":
                     if standalone_match:
                         possible_date_codes.append(standalone_match.group(1).upper())
 
-            buttons(possible_date_codes, "Possible Date Codes", 0.075, 0.4, 6)
+            buttons(possible_date_codes, "Date Codes", 0.075, 0.4, 6)
 
             # Quantities Logic
             possible_quantities = []
@@ -592,7 +608,7 @@ if __name__ == "__main__":
                     if standalone_match:
                         possible_quantities.append(standalone_match.group(1))
 
-            buttons(possible_quantities, "Possible Quantities", 0.075, 0.6, 7)
+            buttons(possible_quantities, "Quantities", 0.075, 0.6, 7)
 
 
             print("Initial blank entry layout:", entry)
@@ -604,10 +620,8 @@ if __name__ == "__main__":
             Etch.place(relx=0.65, rely=0.88, relwidth=0.333, relheight=0.075 * 1.3)
 
             tk.Button(root, text="Save and Quit",
-                      command=lambda: ([update_entry(loc, box.get()) for box, loc in text_boxes if box.get() != ""],
-                                       save_and_quit(entry)), font=meta_font).place(relx=0.02, rely=0.88,
-                                                                                    relwidth=0.333,
-                                                                                    relheight=0.075 * 1.3)
+                      command=lambda: save_and_quit_action(entry, text_boxes, root),
+                      font=meta_font).place(relx=0.02, rely=0.88, relwidth=0.333, relheight=0.075 * 1.3)
 
             for widget in root.winfo_children():
                 widget.configure(bg=bg_color)
@@ -620,9 +634,7 @@ if __name__ == "__main__":
             messagebox.showinfo("Sorting Instructions", f"Place in:\nType: {entry[3].upper()}\nPackage: {entry[5]}")
 
             try:
-                with open(csv_file_name, mode='a', newline='', encoding='utf-8') as csvFile:
-                    writer = csv.writer(csvFile)
-                    writer.writerow(entry)
+                write_row_to_csv(entry)
             except PermissionError:
                 print(f"ERROR: File lock encountered. Could not auto-save row to {csv_file_name}.")
                 bad()
