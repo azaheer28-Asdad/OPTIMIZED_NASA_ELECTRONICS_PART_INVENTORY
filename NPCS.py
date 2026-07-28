@@ -449,13 +449,22 @@ def save_and_quit_action(current_entry, text_boxes_list, root_win):
     quit_it()
 
 
+def toggle_button(btn, loc, val):
+    """Toggles button color: turns blue & saves value on first click; turns white & saves 'None' on second click."""
+    if btn.cget("bg") == "lightblue":
+        btn.config(bg="white")
+        update_entry(loc, "None")
+    else:
+        btn.config(bg="lightblue")
+        update_entry(loc, val)
+
 # --- GUI Buttons ---
 
 def buttons(possible_parts, title, button_thick, next_label_length, loc, auto_fill=True):
     tk.Label(root, text=title, font=word_font).place(relx=0, rely=0 + next_label_length, relheight=button_thick / 2)
 
-    btn_none = tk.Button(root, text="None", bg="white", font=word_font,
-                         command=lambda: [update_entry(loc, "None"), btn_none.config(bg="lightblue")])
+    btn_none = tk.Button(root, text="None", bg="white", font=word_font)
+    btn_none.config(command=lambda: toggle_button(btn_none, loc, "None"))
     btn_none.place(relx=0.17, rely=0 + next_label_length, relwidth=0.15, relheight=button_thick / 2)
 
     tk.Label(root, text="Edit:", font=word_font).place(relx=0.30, rely=0 + next_label_length,
@@ -478,32 +487,31 @@ def buttons(possible_parts, title, button_thick, next_label_length, loc, auto_fi
                                                                                      rely=0.04 + next_label_length)
             update_entry(loc, display_parts[0])
         else:
-            btn1 = tk.Button(root, text=display_parts[0], bg="white", font=word_font,
-                             command=lambda: [update_entry(loc, display_parts[0]), btn1.config(bg="lightblue")])
+            btn1 = tk.Button(root, text=display_parts[0], bg="white", font=word_font)
+            btn1.config(command=lambda: toggle_button(btn1, loc, display_parts[0]))
             btn1.place(relx=0, rely=0.04 + next_label_length, relwidth=0.5, relheight=button_thick)
 
     elif len(display_parts) == 2:
-        btn1 = tk.Button(root, text=display_parts[0], bg="white", font=word_font,
-                         command=lambda: [update_entry(loc, display_parts[0]), btn1.config(bg="lightblue")])
+        btn1 = tk.Button(root, text=display_parts[0], bg="white", font=word_font)
+        btn1.config(command=lambda: toggle_button(btn1, loc, display_parts[0]))
         btn1.place(relx=0, rely=0.04 + next_label_length, relwidth=0.5, relheight=button_thick)
 
-        btn2 = tk.Button(root, text=display_parts[1], bg="white", font=word_font,
-                         command=lambda: [update_entry(loc, display_parts[1]), btn2.config(bg="lightblue")])
+        btn2 = tk.Button(root, text=display_parts[1], bg="white", font=word_font)
+        btn2.config(command=lambda: toggle_button(btn2, loc, display_parts[1]))
         btn2.place(relx=0.5, rely=0.04 + next_label_length, relwidth=0.5, relheight=button_thick)
 
     elif len(display_parts) == 3:
-        btn1 = tk.Button(root, text=display_parts[0], bg="white", font=word_font,
-                         command=lambda: [update_entry(loc, display_parts[0]), btn1.config(bg="lightblue")])
+        btn1 = tk.Button(root, text=display_parts[0], bg="white", font=word_font)
+        btn1.config(command=lambda: toggle_button(btn1, loc, display_parts[0]))
         btn1.place(relx=0, rely=0.04 + next_label_length, relwidth=0.333, relheight=button_thick)
 
-        btn2 = tk.Button(root, text=display_parts[1], bg="white", font=word_font,
-                         command=lambda: [update_entry(loc, display_parts[1]), btn2.config(bg="lightblue")])
+        btn2 = tk.Button(root, text=display_parts[1], bg="white", font=word_font)
+        btn2.config(command=lambda: toggle_button(btn2, loc, display_parts[1]))
         btn2.place(relx=0.333, rely=0.04 + next_label_length, relwidth=0.333, relheight=button_thick)
 
-        btn3 = tk.Button(root, text=display_parts[2], bg="white", font=word_font,
-                         command=lambda: [update_entry(loc, display_parts[2]), btn3.config(bg="lightblue")])
+        btn3 = tk.Button(root, text=display_parts[2], bg="white", font=word_font)
+        btn3.config(command=lambda: toggle_button(btn3, loc, display_parts[2]))
         btn3.place(relx=0.666, rely=0.04 + next_label_length, relwidth=0.333, relheight=button_thick)
-
 
 # --- Main Application Loop ---
 
