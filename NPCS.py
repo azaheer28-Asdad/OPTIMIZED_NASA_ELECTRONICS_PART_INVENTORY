@@ -449,22 +449,45 @@ def save_and_quit_action(current_entry, text_boxes_list, root_win):
     quit_it()
 
 
-def toggle_button(btn, loc, val):
-    """Toggles button color: turns blue & saves value on first click; turns white & saves 'None' on second click."""
+def toggle_button(btn, loc, val, group_buttons=None):
+    """Toggles button color: turns blue & saves value on first click; resets to lightgray on second click or when another button is clicked."""
     if btn.cget("bg") == "lightblue":
-        btn.config(bg="white")
+        btn.config(bg="lightgray")
         update_entry(loc, "None")
     else:
+        if group_buttons:
+            for b in group_buttons:
+                b.config(bg="lightgray")
         btn.config(bg="lightblue")
         update_entry(loc, val)
+
+
+def handle_edit_click(edite, option_buttons, display_parts):
+    """Fills the Edit entry box with the selected (blue) button's text, or defaults to the 2nd (or last) item."""
+    if edite.get() != "":
+        return
+
+    # Check if any option button in this row is currently selected (lightblue)
+    active_btn = next((b for b in option_buttons if b.cget("bg") == "lightblue"), None)
+
+    if active_btn:
+        edite.insert(0, active_btn.cget("text"))
+    elif display_parts:
+        # If no button clicked: edit 2nd item if available, otherwise the last/first item
+        if len(display_parts) >= 2:
+            edite.insert(0, display_parts[1])
+        else:
+            edite.insert(0, display_parts[-1])
 
 # --- GUI Buttons ---
 
 def buttons(possible_parts, title, button_thick, next_label_length, loc, auto_fill=True):
     tk.Label(root, text=title, font=word_font).place(relx=0, rely=0 + next_label_length, relheight=button_thick / 2)
 
-    btn_none = tk.Button(root, text="None", bg="white", font=word_font)
-    btn_none.config(command=lambda: toggle_button(btn_none, loc, "None"))
+    display_parts = possible_parts[:3]
+    option_buttons = []
+
+    btn_none = tk.Button(root, text="None", bg="lightgray", font=word_font)
     btn_none.place(relx=0.17, rely=0 + next_label_length, relwidth=0.15, relheight=button_thick / 2)
 
     tk.Label(root, text="Edit:", font=word_font).place(relx=0.30, rely=0 + next_label_length,
@@ -473,13 +496,12 @@ def buttons(possible_parts, title, button_thick, next_label_length, loc, auto_fi
     edite = tk.Entry(root, width=50)
     text_boxes.append((edite, loc))
     edite.place(relx=0.35, rely=0 + next_label_length, relheight=button_thick / 2)
-    edite.bind('<Return>', lambda event, e=edite, l=loc: update_entry(l, e.get()))
 
-    edite.bind('<Button-1>',
-               lambda event, e=edite, p=possible_parts: e.insert(0, p[0]) if len(p) > 0 and e.get() == "" else None)
+    # Dynamic edit click binding
+    edite.bind('<Button-1>', lambda event: handle_edit_click(edite, option_buttons, display_parts))
     edite.bind('<Return>', lambda event, e=edite, l=loc: [update_entry(l, e.get()), e.config(bg="#D4EDDA")])
 
-    display_parts = possible_parts[:3]
+    btn_none.config(command=lambda: toggle_button(btn_none, loc, "None", option_buttons))
 
     if len(display_parts) == 1:
         if auto_fill:
@@ -487,32 +509,37 @@ def buttons(possible_parts, title, button_thick, next_label_length, loc, auto_fi
                                                                                      rely=0.04 + next_label_length)
             update_entry(loc, display_parts[0])
         else:
-            btn1 = tk.Button(root, text=display_parts[0], bg="white", font=word_font)
-            btn1.config(command=lambda: toggle_button(btn1, loc, display_parts[0]))
+            btn1 = tk.Button(root, text=display_parts[0], bg="lightgray", font=word_font)
+            btn1.config(command=lambda: toggle_button(btn1, loc, display_parts[0], option_buttons + [btn_none]))
             btn1.place(relx=0, rely=0.04 + next_label_length, relwidth=0.5, relheight=button_thick)
+            option_buttons.append(btn1)
 
     elif len(display_parts) == 2:
-        btn1 = tk.Button(root, text=display_parts[0], bg="white", font=word_font)
-        btn1.config(command=lambda: toggle_button(btn1, loc, display_parts[0]))
+        btn1 = tk.Button(root, text=display_parts[0], bg="lightgray", font=word_font)
+        btn1.config(command=lambda: toggle_button(btn1, loc, display_parts[0], option_buttons + [btn_none]))
         btn1.place(relx=0, rely=0.04 + next_label_length, relwidth=0.5, relheight=button_thick)
+        option_buttons.append(btn1)
 
-        btn2 = tk.Button(root, text=display_parts[1], bg="white", font=word_font)
-        btn2.config(command=lambda: toggle_button(btn2, loc, display_parts[1]))
+        btn2 = tk.Button(root, text=display_parts[1], bg="lightgray", font=word_font)
+        btn2.config(command=lambda: toggle_button(btn2, loc, display_parts[1], option_buttons + [btn_none]))
         btn2.place(relx=0.5, rely=0.04 + next_label_length, relwidth=0.5, relheight=button_thick)
+        option_buttons.append(btn2)
 
     elif len(display_parts) == 3:
-        btn1 = tk.Button(root, text=display_parts[0], bg="white", font=word_font)
-        btn1.config(command=lambda: toggle_button(btn1, loc, display_parts[0]))
+        btn1 = tk.Button(root, text=display_parts[0], bg="lightgray", font=word_font)
+        btn1.config(command=lambda: toggle_button(btn1, loc, display_parts[0], option_buttons + [btn_none]))
         btn1.place(relx=0, rely=0.04 + next_label_length, relwidth=0.333, relheight=button_thick)
+        option_buttons.append(btn1)
 
-        btn2 = tk.Button(root, text=display_parts[1], bg="white", font=word_font)
-        btn2.config(command=lambda: toggle_button(btn2, loc, display_parts[1]))
+        btn2 = tk.Button(root, text=display_parts[1], bg="lightgray", font=word_font)
+        btn2.config(command=lambda: toggle_button(btn2, loc, display_parts[1], option_buttons + [btn_none]))
         btn2.place(relx=0.333, rely=0.04 + next_label_length, relwidth=0.333, relheight=button_thick)
+        option_buttons.append(btn2)
 
-        btn3 = tk.Button(root, text=display_parts[2], bg="white", font=word_font)
-        btn3.config(command=lambda: toggle_button(btn3, loc, display_parts[2]))
+        btn3 = tk.Button(root, text=display_parts[2], bg="lightgray", font=word_font)
+        btn3.config(command=lambda: toggle_button(btn3, loc, display_parts[2], option_buttons + [btn_none]))
         btn3.place(relx=0.666, rely=0.04 + next_label_length, relwidth=0.333, relheight=button_thick)
-
+        option_buttons.append(btn3)
 # --- Main Application Loop ---
 
 if __name__ == "__main__":
@@ -618,6 +645,8 @@ if __name__ == "__main__":
 
             buttons(possible_quantities, "Quantities", 0.075, 0.6, 7)
 
+            # Clears focus when clicking background/labels, but allows text boxes to keep focus when clicked
+            root.bind('<Button-1>', lambda event: root.focus() if not isinstance(event.widget, tk.Entry) else None)
 
             print("Initial blank entry layout:", entry)
 
