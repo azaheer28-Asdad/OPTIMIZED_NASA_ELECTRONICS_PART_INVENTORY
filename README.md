@@ -59,7 +59,7 @@ setx MOUSER_API_KEY "ogaeoruegpoiuhp845hpgq9peiurbggfdfak"
 * Chrome will not flag the file, but Windows will. Go to File Explorer right after the file finishes the download, and right-click on the file, select "Properties," and under the "Security" section at the bottom, check the box that says "unblock" → apply → ok → double-click the file to launch it and wait. After installation, it will auto-launch; just give it 1 - 2 minutes, and it will be ready to go. (The first-time launch takes a bit longer.) 
 
 * ### Microsoft Edge:
-
+* NASA Personnel - please do not use Edge to download, as it may block the download.
 * Edge will flag the file. It will say that you don't often install files from here or something like that. Hover over the file with the error (you just downloaded) → keep → click the down arrow next to the delete button. Keep Anyway → Click the file in the browser once to launch or, alternatively, double-click the file in File Explorer and wait. After installation, it will The first time, just give it 1 - 2 more seconds, and it will be ready to go. (The first-time launch takes a bit longer.)
 
  
