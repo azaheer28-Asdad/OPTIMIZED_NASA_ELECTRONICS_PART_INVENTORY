@@ -126,7 +126,7 @@ def bad():
 
 
     
-HEADER_LIST = ['Box ID', 'Part', 'Alt Part Number', 'Type', 'Desc', 'Package', 'Date', 'Quantity']
+HEADER_LIST = ['Box ID', 'Part', 'Alt Part Number', 'Type', 'Desc', 'Package', 'Date', 'Quantity', 'Manufacturer']
 
 def write_row_to_csv(data_row):
     """Writes a row and automatically adds headers if the file is new or empty."""
@@ -540,7 +540,37 @@ def buttons(possible_parts, title, button_thick, next_label_length, loc, auto_fi
         btn3.config(command=lambda: toggle_button(btn3, loc, display_parts[2], option_buttons + [btn_none]))
         btn3.place(relx=0.666, rely=0.04 + next_label_length, relwidth=0.333, relheight=button_thick)
         option_buttons.append(btn3)
-# --- Main Application Loop ---
+
+def manufacturer_buttons(title, button_thick, next_label_length, loc):
+    tk.Label(root, text=title, font=word_font).place(relx=0, rely=0 + next_label_length, relheight=button_thick / 2)
+    option_buttons = []
+
+    btn_none = tk.Button(root, text="None", bg="lightgray", font=word_font)
+    btn_none.place(relx=0.17, rely=0 + next_label_length, relwidth=0.15, relheight=button_thick / 2)
+
+    tk.Label(root, text="Edit:", font=word_font).place(relx=0.30, rely=0 + next_label_length,
+                                                       relheight=button_thick / 2)
+
+    edite = tk.Entry(root, width=50)
+    text_boxes.append((edite, loc))
+    edite.place(relx=0.35, rely=0 + next_label_length, relheight=button_thick / 2)
+
+    edite.bind('<Button-1>', lambda event: handle_edit_click(edite, option_buttons, []))
+    edite.bind('<Return>', lambda event, e=edite, l=loc: [update_entry(l, e.get()), e.config(bg="#D4EDDA")])
+
+    btn_none.config(command=lambda: toggle_button(btn_none, loc, "None", option_buttons))
+
+    # Manufacturers based directly on your CSV sheet & OCR logs
+    mfrs = ["AVX", "ADI", "Vanguard", "KEMET", "Vishay", "Amphenol", "TI"]
+    btn_width = 1.0 / len(mfrs)
+
+    for i, mfr in enumerate(mfrs):
+        btn = tk.Button(root, text=mfr, bg="lightgray", font=word_font)
+        btn.config(command=lambda b=btn, m=mfr: toggle_button(b, loc, m, option_buttons + [btn_none]))
+        btn.place(relx=i * btn_width, rely=0.04 + next_label_length, relwidth=btn_width, relheight=button_thick)
+        option_buttons.append(btn)
+
+    # --- Main Application Loop ---
 
 if __name__ == "__main__":
 
@@ -589,7 +619,8 @@ if __name__ == "__main__":
             meta_font = font.Font(family="Helvetica", size=17, weight="bold")
             word_font = font.Font(family="Helvetica", size=10, weight="bold")
 
-            entry = ["", "", "", "", "", "", "", ""]
+            # Added 9th slot for Manufacturer
+            entry = ["", "", "", "", "", "", "", "", ""]
             text_boxes = []
 
             temp_img_path = os.path.join(tempfile.gettempdir(), "npcs_label.jpg")
@@ -610,8 +641,9 @@ if __name__ == "__main__":
                     if not clean_m.startswith("DC-") and clean_m not in possible_parts:
                         possible_parts.append(clean_m)
 
-            buttons(possible_parts, "Possible Parts", 0.075, 0, 1, auto_fill=True)
-            buttons(possible_parts, "Alt Part Number", 0.075, 0.2, 2, auto_fill=False)
+            # Adjusted spacing (0, 0.17, 0.34, 0.51, 0.68) to fit the new row
+            buttons(possible_parts, "Possible Parts", 0.075, 0.0, 1, auto_fill=True)
+            buttons(possible_parts, "Alt Part Number", 0.075, 0.17, 2, auto_fill=False)
 
             # Date Codes Logic
             possible_date_codes = []
@@ -627,7 +659,7 @@ if __name__ == "__main__":
                     if standalone_match:
                         possible_date_codes.append(standalone_match.group(1).upper())
 
-            buttons(possible_date_codes, "Date Codes", 0.075, 0.4, 6)
+            buttons(possible_date_codes, "Date Codes", 0.075, 0.34, 6)
 
             # Quantities Logic
             possible_quantities = []
@@ -643,7 +675,10 @@ if __name__ == "__main__":
                     if standalone_match:
                         possible_quantities.append(standalone_match.group(1))
 
-            buttons(possible_quantities, "Quantities", 0.075, 0.6, 7)
+            buttons(possible_quantities, "Quantities", 0.075, 0.51, 7)
+
+            # --- New Manufacturer GUI Row (index 8) ---
+            manufacturer_buttons("Manufacturer", 0.075, 0.68, 8)
 
             # Clears focus when clicking background/labels, but allows text boxes to keep focus when clicked
             root.bind('<Button-1>', lambda event: root.focus() if not isinstance(event.widget, tk.Entry) else None)
