@@ -541,34 +541,6 @@ def buttons(possible_parts, title, button_thick, next_label_length, loc, auto_fi
         btn3.place(relx=0.666, rely=0.04 + next_label_length, relwidth=0.333, relheight=button_thick)
         option_buttons.append(btn3)
 
-def manufacturer_buttons(title, button_thick, next_label_length, loc):
-    tk.Label(root, text=title, font=word_font).place(relx=0, rely=0 + next_label_length, relheight=button_thick / 2)
-    option_buttons = []
-
-    btn_none = tk.Button(root, text="None", bg="lightgray", font=word_font)
-    btn_none.place(relx=0.17, rely=0 + next_label_length, relwidth=0.15, relheight=button_thick / 2)
-
-    tk.Label(root, text="Edit:", font=word_font).place(relx=0.30, rely=0 + next_label_length,
-                                                       relheight=button_thick / 2)
-
-    edite = tk.Entry(root, width=50)
-    text_boxes.append((edite, loc))
-    edite.place(relx=0.35, rely=0 + next_label_length, relheight=button_thick / 2)
-
-    edite.bind('<Button-1>', lambda event: handle_edit_click(edite, option_buttons, []))
-    edite.bind('<Return>', lambda event, e=edite, l=loc: [update_entry(l, e.get()), e.config(bg="#D4EDDA")])
-
-    btn_none.config(command=lambda: toggle_button(btn_none, loc, "None", option_buttons))
-
-    # Manufacturers based directly on your CSV sheet & OCR logs
-    mfrs = ["AVX", "ADI", "Vanguard", "KEMET", "Vishay", "Amphenol", "TI"]
-    btn_width = 1.0 / len(mfrs)
-
-    for i, mfr in enumerate(mfrs):
-        btn = tk.Button(root, text=mfr, bg="lightgray", font=word_font)
-        btn.config(command=lambda b=btn, m=mfr: toggle_button(b, loc, m, option_buttons + [btn_none]))
-        btn.place(relx=i * btn_width, rely=0.04 + next_label_length, relwidth=btn_width, relheight=button_thick)
-        option_buttons.append(btn)
 
     # --- Main Application Loop ---
 
@@ -619,7 +591,7 @@ if __name__ == "__main__":
             meta_font = font.Font(family="Helvetica", size=17, weight="bold")
             word_font = font.Font(family="Helvetica", size=10, weight="bold")
 
-            # Added 9th slot for Manufacturer
+
             entry = ["", "", "", "", "", "", "", "", ""]
             text_boxes = []
 
@@ -677,8 +649,32 @@ if __name__ == "__main__":
 
             buttons(possible_quantities, "Quantities", 0.075, 0.51, 7)
 
-            # --- New Manufacturer GUI Row (index 8) ---
-            manufacturer_buttons("Manufacturer", 0.075, 0.68, 8)
+            # Manufacturer / Vendor Logic
+            possible_manufacturers = []
+
+            for text in result:
+                prefix_pattern = re.compile(r"(?i)(?:mfr|mfg|manufacturer|vendor|brand|supplier)\s*[-:]?\s*")
+
+                if prefix_pattern.search(text):
+                    clean_text = prefix_pattern.sub("", text)
+                    # Strip off any trailing fields if multiple labels share a line
+                    clean_text = re.split(r"(?i)\s+(?:p/n|pn|part|qty|date|lot)\b", clean_text)[0].strip()
+                    if clean_text and clean_text not in possible_manufacturers:
+                        possible_manufacturers.append(clean_text)
+
+                else:
+                    # Standalone regex: matches text lines that look like vendor/brand names (letters, spaces, &, -, .)
+                    standalone_match = re.match(r"^\s*([A-Za-z][A-Za-z\s&\.\-]{1,30})\s*$", text)
+                    if standalone_match:
+                        candidate = standalone_match.group(1).strip()
+                        # Ignore standard label noise / origin countries
+                        ignore_list = {"ROHS", "COMPLIANT", "PB FREE", "LEAD FREE", "MADE IN CHINA", "MADE IN USA",
+                                       "TAIWAN"}
+                        if candidate.upper() not in ignore_list:
+                            if candidate not in possible_manufacturers:
+                                possible_manufacturers.append(candidate)
+
+            buttons(possible_manufacturers, "Manufacturers", 0.075, 0.68, 8)
 
             # Clears focus when clicking background/labels, but allows text boxes to keep focus when clicked
             root.bind('<Button-1>', lambda event: root.focus() if not isinstance(event.widget, tk.Entry) else None)
