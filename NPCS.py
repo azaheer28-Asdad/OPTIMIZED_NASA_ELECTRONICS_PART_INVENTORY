@@ -472,12 +472,7 @@ def handle_edit_click(edite, option_buttons, display_parts):
 
     if active_btn:
         edite.insert(0, active_btn.cget("text"))
-    elif display_parts:
-        # If no button clicked: edit 2nd item if available, otherwise the last/first item
-        if len(display_parts) >= 2:
-            edite.insert(0, display_parts[1])
-        else:
-            edite.insert(0, display_parts[-1])
+
 
 # --- GUI Buttons ---
 
