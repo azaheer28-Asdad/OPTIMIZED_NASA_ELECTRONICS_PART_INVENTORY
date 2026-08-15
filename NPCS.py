@@ -125,7 +125,7 @@ def bad():
     time.sleep(1)
 
 
-    
+
 HEADER_LIST = ['Box ID', 'Part', 'Alt Part Number', 'Type', 'Desc', 'Package', 'Date', 'Quantity', 'Manufacturer']
 
 def write_row_to_csv(data_row):
@@ -438,6 +438,8 @@ def save_and_quit_action(current_entry, text_boxes_list, root_win):
     try:
         write_row_to_csv(current_entry)
         good()
+        messagebox.showinfo("Sorting Instructions",
+                            f"Place in:\nType: {current_entry[3].upper()}\nPackage: {current_entry[5]}")
     except PermissionError:
         print(f"ERROR: Cannot save. Please close {csv_file_name} in Excel!")
         bad()
@@ -476,7 +478,7 @@ def handle_edit_click(edite, option_buttons, display_parts):
 
 # --- GUI Buttons ---
 
-def buttons(possible_parts, title, button_thick, next_label_length, loc, auto_fill=True):
+def buttons(root, possible_parts, title, button_thick, next_label_length, loc, word_font, found_font, text_boxes, auto_fill=True):
     tk.Label(root, text=title, font=word_font).place(relx=0, rely=0 + next_label_length, relheight=button_thick / 2)
 
     display_parts = possible_parts[:3]
@@ -541,22 +543,10 @@ def buttons(possible_parts, title, button_thick, next_label_length, loc, auto_fi
 
 if __name__ == "__main__":
 
-
-
     import multiprocessing
     multiprocessing.freeze_support()
 
-
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 500)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 500)
-
-    #vars for the auto capture
-    frame_arr = []
-    tolerance = 1
-    x = 0
-
-    # Force use_angle_cls instead of textline orientation to bypass PP-LCNet
+    # Move OCR init outside loop to avoid reloading paddle models on every re-take
     ocr = PaddleOCR(
         use_textline_orientation=True,
         lang='en',
@@ -564,45 +554,70 @@ if __name__ == "__main__":
         enable_mkldnn=False
     )
 
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 500)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 500)
+
+    # Continuous workflow loop so destroying GUI opens camera feed again
     while True:
-        ret, frame = cap.read()
+        WARMUP_FRAMES = 80
+        STILL_FRAMES_REQUIRED = 4.5
+        tolerance = 1.5
 
-        # Check if frame is valid before showing to prevent OpenCV crash
-        if not ret or frame is None:
-            time.sleep(0.05)
-            continue
-        #immediate black anfd white conversion
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        still_counter = 0
+        frame_arr = []
+        x = 0
+        captured_frame = None
 
-        cv2.imshow("frame", frame)
+        while True:
+            ret, frame = cap.read()
 
-        # store 2 images in array
-        if x > 30:
-            frame_arr.append(frame)
+            if not ret or frame is None:
+                time.sleep(0.05)
+                continue
 
-        if len(frame_arr) == 2:
-            frame_diff = cv2.absdiff(frame_arr[1], frame_arr[0])
-            frame_diff = np.mean(frame_diff)
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            cv2.imshow("frame", gray)
 
-            if frame_diff <= tolerance:
-                temp_img_path = os.path.join(tempfile.gettempdir(), "npcs_label.jpg")
-                cv2.imwrite(temp_img_path, frame)
+            # 1. Skip initial frames during camera exposure warmup
+            if x > WARMUP_FRAMES:
+                frame_arr.append(gray)
 
-                cv2.imshow("Captured Label", frame)
-                cv2.waitKey(2000)
-                break
+            if len(frame_arr) == 2:
+                frame_diff = np.mean(cv2.absdiff(frame_arr[1], frame_arr[0]))
 
-            else:
+                # 2. Track consecutive still frames
+                if frame_diff <= tolerance:
+                    still_counter += 1
+                else:
+                    still_counter = 0  # Reset immediately on motion
+
+                # 3. Capture image only after sustained stillness
+                if still_counter >= STILL_FRAMES_REQUIRED:
+                    temp_img_path = os.path.join(tempfile.gettempdir(), "npcs_label.jpg")
+                    cv2.imwrite(temp_img_path, gray)
+                    captured_frame = gray
+                    cv2.imshow("frame", gray)
+                    cv2.waitKey(2000)
+                    break
+
                 frame_arr.pop(0)
 
-        x += 1
+            x += 1
+            key = cv2.waitKey(1) & 0xFF
 
-        key = cv2.waitKey(1) & 0xFF
+            if cv2.getWindowProperty("frame", cv2.WND_PROP_VISIBLE) < 1:
+                quit_it()
 
-        if cv2.getWindowProperty("frame", cv2.WND_PROP_VISIBLE) < 1:
-            quit_it()
+            if key == 32 or key == ord(' '):
+                temp_img_path = os.path.join(tempfile.gettempdir(), "npcs_label.jpg")
+                cv2.imwrite(temp_img_path, gray)
+                captured_frame = gray
+                break
 
-        if key == 32 or key == ord(' '):
+        cv2.destroyAllWindows()
+
+        if captured_frame is not None:
             root = tk.Tk()
             root.title('NPCS')
             root.geometry("800x600")
@@ -613,12 +628,10 @@ if __name__ == "__main__":
             meta_font = font.Font(family="Helvetica", size=17, weight="bold")
             word_font = font.Font(family="Helvetica", size=10, weight="bold")
 
-
             entry = ["", "", "", "", "", "", "", "", ""]
             text_boxes = []
 
             temp_img_path = os.path.join(tempfile.gettempdir(), "npcs_label.jpg")
-            cv2.imwrite(temp_img_path, frame)
             result = ocr.predict(temp_img_path)
             result = result[0]['rec_texts']
 
@@ -635,9 +648,8 @@ if __name__ == "__main__":
                     if not clean_m.startswith("DC-") and clean_m not in possible_parts:
                         possible_parts.append(clean_m)
 
-            # Adjusted spacing (0, 0.17, 0.34, 0.51, 0.68) to fit the new row
-            buttons(possible_parts, "Possible Parts", 0.075, 0.0, 1, auto_fill=True)
-            buttons(possible_parts, "Alt Part Number", 0.075, 0.17, 2, auto_fill=False)
+            buttons(root, possible_parts, "Possible Parts", 0.075, 0.0, 1, word_font, found_font, text_boxes, auto_fill=True)
+            buttons(root, possible_parts, "Alt Part Number", 0.075, 0.17, 2, word_font, found_font, text_boxes, auto_fill=False)
 
             # Date Codes Logic
             possible_date_codes = []
@@ -653,7 +665,7 @@ if __name__ == "__main__":
                     if standalone_match:
                         possible_date_codes.append(standalone_match.group(1).upper())
 
-            buttons(possible_date_codes, "Date Codes", 0.075, 0.34, 6)
+            buttons(root, possible_date_codes, "Date Codes", 0.075, 0.34, 6, word_font, found_font, text_boxes)
 
             # Quantities Logic
             possible_quantities = []
@@ -669,7 +681,7 @@ if __name__ == "__main__":
                     if standalone_match:
                         possible_quantities.append(standalone_match.group(1))
 
-            buttons(possible_quantities, "Quantities", 0.075, 0.51, 7)
+            buttons(root, possible_quantities, "Quantities", 0.075, 0.51, 7, word_font, found_font, text_boxes)
 
             # Manufacturer / Vendor Logic
             possible_manufacturers = []
@@ -679,54 +691,53 @@ if __name__ == "__main__":
 
                 if prefix_pattern.search(text):
                     clean_text = prefix_pattern.sub("", text)
-                    # Strip off any trailing fields if multiple labels share a line
                     clean_text = re.split(r"(?i)\s+(?:p/n|pn|part|qty|date|lot)\b", clean_text)[0].strip()
                     if clean_text and clean_text not in possible_manufacturers:
                         possible_manufacturers.append(clean_text)
 
                 else:
-                    # Standalone regex: matches text lines that look like vendor/brand names (letters, spaces, &, -, .)
                     standalone_match = re.match(r"^\s*([A-Za-z][A-Za-z\s&\.\-]{1,30})\s*$", text)
                     if standalone_match:
                         candidate = standalone_match.group(1).strip()
-                        # Ignore standard label noise / origin countries
-                        ignore_list = {"ROHS", "COMPLIANT", "PB FREE", "LEAD FREE", "MADE IN CHINA", "MADE IN USA",
-                                       "TAIWAN"}
+                        ignore_list = {"ROHS", "COMPLIANT", "PB FREE", "LEAD FREE", "MADE IN CHINA", "MADE IN USA", "TAIWAN"}
                         if candidate.upper() not in ignore_list:
                             if candidate not in possible_manufacturers:
                                 possible_manufacturers.append(candidate)
 
-            buttons(possible_manufacturers, "Manufacturers", 0.075, 0.68, 8)
+            buttons(root, possible_manufacturers, "Manufacturers", 0.075, 0.68, 8, word_font, found_font, text_boxes)
 
-            # Clears focus when clicking background/labels, but allows text boxes to keep focus when clicked
             root.bind('<Button-1>', lambda event: root.focus() if not isinstance(event.widget, tk.Entry) else None)
 
-            print("Initial blank entry layout:", entry)
+            def etch_and_save():
+                for box, loc in text_boxes:
+                    if box.get() != "":
+                        update_entry(loc, box.get())
+                populate_mouser_data(entry)
+                entry[0] = f"{entry[3].upper()}, {entry[5]}"
+                try:
+                    write_row_to_csv(entry)
+                    good()
+                    messagebox.showinfo("Sorting Instructions", f"Place in:\nType: {entry[3].upper()}\nPackage: {entry[5]}")
+                except PermissionError:
+                    bad()
+                    messagebox.showerror("Save Error", f"Could not auto-save row!\nPlease close '{csv_file_name}' in Excel before parsing the next item.")
+                root.destroy()
 
-            Etch = tk.Button(root, text="Etch into Sheet",
-                             command=lambda: (
-                                 [update_entry(loc, box.get()) for box, loc in text_boxes if box.get() != ""],
-                                 root.destroy(), good()), font=meta_font)
-            Etch.place(relx=0.65, rely=0.88, relwidth=0.333, relheight=0.075 * 1.3)
 
             tk.Button(root, text="Save and Quit",
                       command=lambda: save_and_quit_action(entry, text_boxes, root),
-                      font=meta_font).place(relx=0.02, rely=0.88, relwidth=0.333, relheight=0.075 * 1.3)
+                      font=meta_font).place(relx=0.02, rely=0.88, relwidth=0.31, relheight=0.075 * 1.3)
+
+            tk.Button(root, text="Redo Picture",
+                      command=root.destroy,
+                      font=meta_font).place(relx=0.345, rely=0.88, relwidth=0.31, relheight=0.075 * 1.3)
+
+            Etch = tk.Button(root, text="Etch into Sheet",
+                             command=etch_and_save,
+                             font=meta_font)
+            Etch.place(relx=0.67, rely=0.88, relwidth=0.31, relheight=0.075 * 1.3)
 
             for widget in root.winfo_children():
                 widget.configure(bg=bg_color)
 
             root.mainloop()
-
-            populate_mouser_data(entry)
-            entry[0] = f"{entry[3].upper()}, {entry[5]}"
-
-            messagebox.showinfo("Sorting Instructions", f"Place in:\nType: {entry[3].upper()}\nPackage: {entry[5]}")
-
-            try:
-                write_row_to_csv(entry)
-            except PermissionError:
-                print(f"ERROR: File lock encountered. Could not auto-save row to {csv_file_name}.")
-                bad()
-                messagebox.showerror("Save Error",
-                                     f"Could not auto-save row!\nPlease close '{csv_file_name}' in Excel before parsing the next item.")
