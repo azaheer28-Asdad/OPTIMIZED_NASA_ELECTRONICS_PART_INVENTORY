@@ -551,6 +551,11 @@ if __name__ == "__main__":
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 500)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 500)
 
+    #vars for the auto capture
+    frame_arr = []
+    tolerance = 1
+    x = 0
+
     # Force use_angle_cls instead of textline orientation to bypass PP-LCNet
     ocr = PaddleOCR(
         use_textline_orientation=True,
@@ -566,9 +571,31 @@ if __name__ == "__main__":
         if not ret or frame is None:
             time.sleep(0.05)
             continue
+        #immediate black anfd white conversion
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         cv2.imshow("frame", frame)
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        # store 2 images in array
+        if x > 30:
+            frame_arr.append(frame)
+
+        if len(frame_arr) == 2:
+            frame_diff = cv2.absdiff(frame_arr[1], frame_arr[0])
+            frame_diff = np.mean(frame_diff)
+
+            if frame_diff <= tolerance:
+                temp_img_path = os.path.join(tempfile.gettempdir(), "npcs_label.jpg")
+                cv2.imwrite(temp_img_path, frame)
+
+                cv2.imshow("Captured Label", frame)
+                cv2.waitKey(2000)
+                break
+
+            else:
+                frame_arr.pop(0)
+
+        x += 1
 
         key = cv2.waitKey(1) & 0xFF
 
