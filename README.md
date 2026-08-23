@@ -46,7 +46,7 @@ setx MOUSER_API_KEY "ogaeoruegpoiuhp845hpgq9peiurbggfdfak"
 
 ```
 
-* Close the terminal, go back to GitHub, and download the NPCS_setup.exe file from the releases tab on the right side.
+* Close the terminal, go back to GitHub, and download the NPCS_setup.exe file from the releases tab on the right side. [Or click here if you can't find it](https://github.com/azaheer28-Asdad/Official-NASA-Part-Cataloging-System_NPCS/releases/tag/V7.1)
 
 #### Warning
 
